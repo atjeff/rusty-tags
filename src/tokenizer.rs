@@ -55,7 +55,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, HtmlParseError> {
             '>' => {}
 
             // Otherwise, we're just adding the character to the buffer
-            _ => buffer.push(c),
+            _ => {
+                if !buffer.is_empty() {
+                    buffer.push(c)
+                }
+            }
         }
     }
 
@@ -87,14 +91,12 @@ fn extract_open_tag_info(
             // We found an attribute. Example: ` class="container"`
             ' ' => {
                 chars.next();
-
-                let attribute = extract_attribute(chars);
-
-                attributes.push(attribute);
             }
 
+            // We have a non-space character, so it's the start of an attribute name
             _ => {
-                chars.next();
+                let attribute = extract_attribute(chars);
+                attributes.push(attribute);
             }
         }
     }
@@ -103,7 +105,6 @@ fn extract_open_tag_info(
 }
 
 // Extracts attributes from the input
-// This function assumes that the first character is a "<"
 fn extract_attribute(chars: &mut std::iter::Peekable<std::str::Chars>) -> HtmlAttribute {
     let mut name = String::from("");
     let mut value = String::from("");
@@ -116,7 +117,12 @@ fn extract_attribute(chars: &mut std::iter::Peekable<std::str::Chars>) -> HtmlAt
             break;
         }
 
-        name.push(chars.next().unwrap());
+        // Ignore whitespace while building the attribute name
+        if !c.is_whitespace() {
+            name.push(chars.next().unwrap());
+        } else {
+            chars.next();
+        }
     }
 
     if let Some(&c) = chars.peek() {
@@ -134,7 +140,11 @@ fn extract_attribute(chars: &mut std::iter::Peekable<std::str::Chars>) -> HtmlAt
         }
     }
 
-    HtmlAttribute { name, value }
+    // Trim any whitespace from the beginning and end of the name and value
+    HtmlAttribute {
+        name: name.trim().to_string(),
+        value: value.trim().to_string(),
+    }
 }
 
 // Extracts the tag name from the input
