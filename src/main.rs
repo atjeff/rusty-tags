@@ -2,10 +2,13 @@ mod html_element;
 mod parser;
 mod tokenizer;
 
+use env_logger;
 use html_element::HtmlElement;
 use parser::Parse;
 
 fn main() {
+    env_logger::init();
+
     // Raw string without escaping quotes
     let test_cases = vec![
         r#"<div class="container"><p>Hello, world!</p></div>"#,

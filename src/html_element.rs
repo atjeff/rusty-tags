@@ -10,7 +10,7 @@ pub struct HtmlElement {
     pub children: Vec<HtmlElement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HtmlAttribute {
     pub name: String,
     pub value: String,

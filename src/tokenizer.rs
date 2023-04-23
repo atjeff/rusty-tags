@@ -1,6 +1,7 @@
 use crate::html_element::HtmlAttribute;
+use log::debug;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Token {
     Text(String),
     OpenTag(String, Vec<HtmlAttribute>),
@@ -9,7 +10,6 @@ pub enum Token {
 
 #[derive(Debug)]
 pub enum HtmlParseError {
-    UnexpectedToken(Token),
     UnexpectedEndOfInput,
     MismatchedTag { expected: String, found: String },
 }
@@ -42,6 +42,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, HtmlParseError> {
 
                     // Otherwise, we're opening a tag
                     Some(_) => {
+                        debug!("Opening tag: {:?} {:?} {:?}", c, tokens, buffer);
+
                         let (tag_name, attributes) = extract_open_tag_info(&mut chars);
 
                         tokens.push(Token::OpenTag(tag_name, attributes));
@@ -56,9 +58,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, HtmlParseError> {
 
             // Otherwise, we're just adding the character to the buffer
             _ => {
-                if !buffer.is_empty() {
-                    buffer.push(c)
+                if buffer.is_empty() && c.is_whitespace() {
+                    continue;
                 }
+
+                buffer.push(c);
             }
         }
     }
@@ -88,18 +92,22 @@ fn extract_open_tag_info(
                 break;
             }
 
-            // We found an attribute. Example: ` class="container"`
+            // We have a space, so we can ignore it
             ' ' => {
                 chars.next();
             }
 
             // We have a non-space character, so it's the start of an attribute name
             _ => {
+                debug!("Attribute: {:?} {:?} {:?}", c, tag_name, attributes);
+
                 let attribute = extract_attribute(chars);
                 attributes.push(attribute);
             }
         }
     }
+
+    debug!("Tag: {:?} {:?}", tag_name, attributes);
 
     (tag_name, attributes)
 }
@@ -163,4 +171,59 @@ fn extract_tag_name(chars: &mut std::iter::Peekable<std::str::Chars>) -> String 
     }
 
     tag_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tokenize_open_tag() {
+        let input = "<div>";
+        let tokens = tokenize(input).unwrap();
+        assert_eq!(
+            tokens,
+            vec![Token::OpenTag(String::from("div"), Vec::new())]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_close_tag() {
+        let input = "</div>";
+        let tokens = tokenize(input).unwrap();
+        assert_eq!(tokens, vec![Token::CloseTag(String::from("div"))]);
+    }
+
+    #[test]
+    fn test_tokenize_open_close_tags() {
+        let input = "<div></div>";
+        let tokens = tokenize(input).unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                Token::OpenTag(String::from("div"), Vec::new()),
+                Token::CloseTag(String::from("div")),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_attribute() {
+        let input = r#"<div class="container"></div>"#;
+        let tokens = tokenize(input).unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::OpenTag(
+                    String::from("div"),
+                    vec![HtmlAttribute {
+                        name: String::from("class"),
+                        value: String::from("container"),
+                    }]
+                ),
+                Token::CloseTag(String::from("div")),
+            ]
+        );
+    }
 }
